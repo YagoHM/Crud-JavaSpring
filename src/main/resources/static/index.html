@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CRUD de Filmes</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+
+<div class="container mt-5">
+    <h2 class="text-center mb-4">Cadastro de Filmes</h2>
+
+    <form id="form-filme">
+        <input type="hidden" id="filme-id" value="">
+
+        <div class="mb-3">
+            <label for="titulo" class="form-label">Título</label>
+            <input type="text" class="form-control" id="titulo" required>
+        </div>
+        <div class="mb-3">
+            <label for="diretor" class="form-label">Diretor</label>
+            <input type="text" class="form-control" id="diretor" required>
+        </div>
+        <div class="mb-3">
+            <label for="anoLancamento" class="form-label">Ano de Lançamento</label>
+            <input type="number" class="form-control" id="anoLancamento" required>
+        </div>
+        <div class="mb-3">
+            <label for="genero" class="form-label">Gênero</label>
+            <input type="text" class="form-control" id="genero" required>
+        </div>
+
+        <button type="submit" class="btn btn-primary" id="btn-submit">Cadastrar Filme</button>
+        <button type="button" class="btn btn-secondary" id="btn-cancelar" style="display:none;" onclick="cancelarEdicao()">Cancelar</button>
+    </form>
+
+    <h2 class="text-center mt-5">Lista de Filmes</h2>
+    <table class="table table-bordered table-striped mt-4" id="tabela-filmes">
+        <thead class="table-dark">
+        <tr>
+            <th>Título</th>
+            <th>Diretor</th>
+            <th>Ano de Lançamento</th>
+            <th>Gênero</th>
+            <th>Ações</th>
+        </tr>
+        </thead>
+        <tbody>
+        </tbody>
+    </table>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    // Carregar lista de filmes
+    function listarFilmes() {
+        fetch('/filme')
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Erro ao carregar filmes');
+                }
+                return response.json();
+            })
+            .then(filmes => {
+                const tabela = document.querySelector('#tabela-filmes tbody');
+                tabela.innerHTML = '';
+
+                if (filmes.length === 0) {
+                    tabela.innerHTML = '<tr><td colspan="5" class="text-center">Nenhum filme cadastrado</td></tr>';
+                    return;
+                }
+
+                filmes.forEach(filme => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${filme.titulo}</td>
+                        <td>${filme.diretor}</td>
+                        <td>${filme.anoLancamento}</td>
+                        <td>${filme.genero}</td>
+                        <td>
+                            <button class="btn btn-warning btn-sm" onclick="editarFilme(${filme.id})">
+                                <i class="bi bi-pencil"></i> Editar
+                            </button>
+                            <button class="btn btn-danger btn-sm" onclick="excluirFilme(${filme.id})">
+                                <i class="bi bi-trash"></i> Excluir
+                            </button>
+                        </td>
+                    `;
+                    tabela.appendChild(tr);
+                });
+            })
+            .catch(error => {
+                console.error('Erro:', error);
+                alert('Erro ao carregar lista de filmes');
+            });
+    }
+
+    // Submissão do formulário (cadastrar ou atualizar)
+    document.getElementById('form-filme').addEventListener('submit', function (e) {
+        e.preventDefault();
+
+        const id = document.getElementById('filme-id').value;
+        const titulo = document.getElementById('titulo').value.trim();
+        const diretor = document.getElementById('diretor').value.trim();
+        const anoLancamento = parseInt(document.getElementById('anoLancamento').value);
+        const genero = document.getElementById('genero').value.trim();
+
+        // Validações básicas
+        if (!titulo || !diretor || !anoLancamento || !genero) {
+            alert('Por favor, preencha todos os campos!');
+            return;
+        }
+
+        if (anoLancamento < 1800 || anoLancamento > new Date().getFullYear() + 10) {
+            alert('Ano de lançamento inválido!');
+            return;
+        }
+
+        const filme = {
+            titulo,
+            diretor,
+            anoLancamento,
+            genero
+        };
+
+        if (id) {
+            // ATUALIZAR filme existente
+            fetch(`/filme/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(filme),
+            })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Erro ao atualizar filme');
+                    }
+                    return response.json();
+                })
+                .then(() => {
+                    alert('Filme atualizado com sucesso!');
+                    listarFilmes();
+                    limparFormulario();
+                })
+                .catch(error => {
+                    console.error('Erro:', error);
+                    alert('Erro ao atualizar filme. Verifique se o filme ainda existe.');
+                });
+        } else {
+            // CADASTRAR novo filme
+            fetch('/filme', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(filme),
+            })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Erro ao cadastrar filme');
+                    }
+                    return response.json();
+                })
+                .then(() => {
+                    alert('Filme cadastrado com sucesso!');
+                    listarFilmes();
+                    limparFormulario();
+                })
+                .catch(error => {
+                    console.error('Erro:', error);
+                    alert('Erro ao cadastrar filme. Verifique os dados e tente novamente.');
+                });
+        }
+    });
+
+    // Editar filme
+    function editarFilme(id) {
+        fetch(`/filme/${id}`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Filme não encontrado');
+                }
+                return response.json();
+            })
+            .then(filme => {
+                // Preenche o formulário com os dados do filme
+                document.getElementById('filme-id').value = filme.id;
+                document.getElementById('titulo').value = filme.titulo;
+                document.getElementById('diretor').value = filme.diretor;
+                document.getElementById('anoLancamento').value = filme.anoLancamento;
+                document.getElementById('genero').value = filme.genero;
+
+                // Muda o visual do botão
+                const btnSubmit = document.getElementById('btn-submit');
+                btnSubmit.textContent = 'Atualizar Filme';
+                btnSubmit.classList.remove('btn-primary');
+                btnSubmit.classList.add('btn-success');
+
+                // Mostra o botão cancelar
+                document.getElementById('btn-cancelar').style.display = 'inline-block';
+
+                // Scroll suave para o formulário
+                document.getElementById('form-filme').scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'start'
+                });
+            })
+            .catch(error => {
+                console.error('Erro:', error);
+                alert('Erro ao carregar dados do filme');
+            });
+    }
+
+    // Excluir filme
+    function excluirFilme(id) {
+        if (confirm('Você tem certeza que deseja excluir este filme?')) {
+            fetch(`/filme/${id}`, {
+                method: 'DELETE'
+            })
+                .then(response => {
+                    if (response.ok || response.status === 204) {
+                        alert('Filme excluído com sucesso!');
+                        listarFilmes();
+                    } else {
+                        throw new Error('Erro ao excluir filme');
+                    }
+                })
+                .catch(error => {
+                    console.error('Erro:', error);
+                    alert('Erro ao excluir filme. Verifique se o filme ainda existe.');
+                });
+        }
+    }
+
+    // Cancelar edição
+    function cancelarEdicao() {
+        limparFormulario();
+    }
+
+    // Limpar formulário e resetar estado
+    function limparFormulario() {
+        document.getElementById('form-filme').reset();
+        document.getElementById('filme-id').value = '';
+
+        const btnSubmit = document.getElementById('btn-submit');
+        btnSubmit.textContent = 'Cadastrar Filme';
+        btnSubmit.classList.remove('btn-success');
+        btnSubmit.classList.add('btn-primary');
+
+        document.getElementById('btn-cancelar').style.display = 'none';
+    }
+
+    // Carregar filmes ao iniciar a página
+    window.addEventListener('DOMContentLoaded', function() {
+        listarFilmes();
+    });
+</script>
+
+</body>
+</html>
